@@ -7274,16 +7274,17 @@ class OpenAIHandlerMixin:
         ws_memory_tools_allowed = _allow_responses_memory_tools(is_chatgpt_auth)
         _lower_headers = {k.lower(): v for k, v in upstream_headers.items()}
 
+        _raw_base = (getattr(self, "OPENAI_API_URL", None) or "").rstrip("/")
+        _normalized_base = _raw_base[:-3] if _raw_base.endswith("/v1") else _raw_base
+        _is_custom_upstream = bool(_normalized_base) and _normalized_base != "https://api.openai.com"
+
         # Build upstream WebSocket URL based on auth mode
-        if is_chatgpt_auth:
+        if is_chatgpt_auth and not _is_custom_upstream:
             # ChatGPT session auth → route to chatgpt.com backend
             upstream_url = codex_responses_websocket_url()
-            logger.debug(
-                f"[{request_id}] WS: ChatGPT session auth detected, routing to chatgpt.com"
-            )
         else:
-            # API key auth → route to configured OpenAI API URL
-            base = self.OPENAI_API_URL
+            # API key auth or custom upstream → route to configured OpenAI API URL
+            base = getattr(self, "OPENAI_API_URL", "https://api.openai.com")
             ws_base = base.replace("https://", "wss://").replace("http://", "ws://")
             upstream_url = build_copilot_upstream_url(ws_base, "/v1/responses")
 
@@ -10047,10 +10048,16 @@ class OpenAIHandlerMixin:
 
         # Route to correct endpoint based on auth mode
         is_chatgpt_fallback = has_chatgpt_account_header(upstream_headers)
-        if is_chatgpt_fallback:
+
+        _raw_base = (getattr(self, "OPENAI_API_URL", None) or "").rstrip("/")
+        _normalized_base = _raw_base[:-3] if _raw_base.endswith("/v1") else _raw_base
+        _is_custom_upstream = bool(_normalized_base) and _normalized_base != "https://api.openai.com"
+
+        if is_chatgpt_fallback and not _is_custom_upstream:
             http_url = codex_responses_http_url()
         else:
-            http_url = build_copilot_upstream_url(self.OPENAI_API_URL, "/v1/responses")
+            base = getattr(self, "OPENAI_API_URL", "https://api.openai.com")
+            http_url = build_copilot_upstream_url(base, "/v1/responses")
 
         # Build HTTP body from the WS response.create payload.
         # WS messages use {"type": "response.create", "response": {...}} wrapper.
