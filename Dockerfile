@@ -214,8 +214,8 @@ ARG RUNTIME_USER=nonroot
 ARG PYTHON_SITE_PACKAGES
 
 COPY --from=builder ${PYTHON_SITE_PACKAGES} ${PYTHON_SITE_PACKAGES}
-# Native Rust reverse proxy binary (issue #976).
-COPY --from=builder /usr/local/bin/headroom-proxy /usr/local/bin/headroom-proxy
+# This gateway target runs only the Python proxy. The native compression
+# extension remains in site-packages; the separate Rust proxy is not copied.
 
 USER ${RUNTIME_USER}
 WORKDIR /app
